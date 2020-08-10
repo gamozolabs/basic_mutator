@@ -408,7 +408,7 @@ impl Mutator {
         // Convert the range to a random number from [-range, range]
         let delta = self.rng.rand(0, range * 2) as i32 - range as i32;
 
-        /// Macro to mutate bytes in the file as a `$ty`
+        /// Macro to mutate bytes in the input as a `$ty`
         macro_rules! mutate {
             ($ty:ty) => {{
                 // Interpret the `offset` as a `$ty`
@@ -459,7 +459,7 @@ impl Mutator {
         // Pick offset to memset at
         let offset = self.rand_offset();
 
-        // Pick random length to remainder of file
+        // Pick random length to remainder of input
         let len = self.rng.rand_exp(1, self.input.len() - offset);
 
         // Pick the value to memset
