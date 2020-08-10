@@ -34,16 +34,22 @@ pub trait InputDatabase {
 }
 
 /// A basic random number generator based on xorshift64 with 64-bits of state
-struct Rng(u64);
+struct Rng {
+    /// The RNG's seed and state
+    seed: u64,
+
+    /// If set, `rand_exp` behaves the same as `rand`
+    exp_disabled: bool,
+}
 
 impl Rng {
     /// Generate a random number
     #[inline]
     fn next(&mut self) -> u64 {
-        let val = self.0;
-        self.0 ^= self.0 << 13;
-        self.0 ^= self.0 >> 17;
-        self.0 ^= self.0 << 43;
+        let val = self.seed;
+        self.seed ^= self.seed << 13;
+        self.seed ^= self.seed >> 17;
+        self.seed ^= self.seed << 43;
         val
     }
 
@@ -73,6 +79,11 @@ impl Rng {
     /// this will always return uniform at least half the time.
     #[inline]
     fn rand_exp(&mut self, min: usize, max: usize) -> usize {
+        // If exponential random is disabled, fall back to uniform
+        if self.exp_disabled {
+            return self.rand(min, max);
+        }
+
         if self.rand(0, 1) == 0 {
             // Half the time, provide uniform
             self.rand(min, max)
@@ -116,7 +127,7 @@ pub struct Mutator {
 
     /// Maximum size to allow inputs to expand to
     max_input_size: usize,
-    
+
     /// The random number generator used for mutations
     rng: Rng,
 
@@ -158,9 +169,12 @@ impl Mutator {
         Mutator {
             input:          Vec::new(),
             accessed:       Vec::new(),
-            rng:            Rng(0x12640367f4b7ea35),
             max_input_size: 1024,
             printable:      false,
+            rng: Rng {
+                seed:         0x12640367f4b7ea35,
+                exp_disabled: false,
+            },
         }
     }
 
@@ -174,10 +188,17 @@ impl Mutator {
         self.printable = printable;
         self
     }
+    
+    /// Allows enabling and disabling of exponential random in the fuzzer. If
+    /// disabled, all random selections will be uniform.
+    pub fn rand_exp(mut self, exponential_random: bool) -> Self {
+        self.rng.exp_disabled = !exponential_random;
+        self
+    }
 
     /// Sets the seed for the internal RNG
     pub fn seed(mut self, seed: u64) -> Self {
-        self.rng.0 = seed ^ 0x12640367f4b7ea35;
+        self.rng.seed = seed ^ 0x12640367f4b7ea35;
         self
     }
 
@@ -213,6 +234,13 @@ impl Mutator {
             Mutator::splice_overwrite,
             Mutator::splice_insert,
         ];
+
+        // Save the old state of the exponential random and randomly disable
+        // the exponential random
+        let old_exp_state = self.rng.exp_disabled;
+        if self.rng.rand(0, 1) == 0 {
+            self.rng.exp_disabled = true;
+        }
 
         for _ in 0..mutations {
             // Pick a random mutation strategy
@@ -273,8 +301,10 @@ impl Mutator {
                 // Run the mutation strategy
                 strat(self);
             }
-
         }
+            
+        // Restore exponential random state to the old state
+        self.rng.exp_disabled = old_exp_state;
     }
 
     /// Pick a random offset in the input to corrupt. Any mutation
