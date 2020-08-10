@@ -154,22 +154,37 @@ macro_rules! byte_corruptor {
 
 impl Mutator { 
     /// Create a new mutator
-    ///
-    /// `max_input_size` specifies the maximum input size that will be produced
-    /// and consumed by the mutator.
-    ///
-    /// `printable` specifies if the output should only contain ASCII printable
-    /// characters
-    ///
-    /// `seed` specifies a seed for the random number generator
-    pub fn new(max_input_size: usize, printable: bool, seed: u64) -> Self {
+    pub fn new() -> Self {
         Mutator {
             input:          Vec::new(),
             accessed:       Vec::new(),
-            rng:            Rng(seed ^ 0x12640367f4b7ea35),
-            max_input_size: max_input_size,
-            printable:      printable,
+            rng:            Rng(0x12640367f4b7ea35),
+            max_input_size: 1024,
+            printable:      false,
         }
+    }
+
+    /// Set whether or not this mutator should produce only ASCII-printable
+    /// characters.
+    ///
+    /// If non-printable characters are used in part of the corpus or existing
+    /// input, they may be inherited and still exist in the output of the
+    /// fuzzer.
+    pub fn printable(mut self, printable: bool) -> Self {
+        self.printable = printable;
+        self
+    }
+
+    /// Sets the seed for the internal RNG
+    pub fn seed(mut self, seed: u64) -> Self {
+        self.rng.0 = seed ^ 0x12640367f4b7ea35;
+        self
+    }
+
+    /// Sets the maximum input size
+    pub fn max_input_size(mut self, size: usize) -> Self {
+        self.max_input_size = size;
+        self
     }
 
     /// Performs standard mutation of an the input
@@ -854,9 +869,8 @@ impl Mutator {
 
 #[test]
 fn simple_example() {
-    // Create a seeded mutator with a maximum size of 128 bytes for printable
-    // ASCII characters
-    let mut mutator = Mutator::new(128, true, 0xd7ebfe9b8e89fa50);
+    // Create a mutator for 128-byte ASCII printable inputs
+    let mut mutator = Mutator::new().max_input_size(128).printable(true);
 
     for _ in 0..128 {
         // Update the input
@@ -888,9 +902,8 @@ fn corpus_example() {
         }
     }
 
-    // Create a seeded mutator with a maximum size of 128 bytes for printable
-    // ASCII characters
-    let mut mutator = Mutator::new(128, true, 0xd7ebfe9b8e89fa50);
+    // Create a mutator for 128-byte ASCII printable inputs
+    let mut mutator = Mutator::new().max_input_size(128).printable(true);
 
     for _ in 0..128 {
         // Update the input

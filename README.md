@@ -74,9 +74,8 @@ Here's a basic example with no corpus or `accessed` guidance.
 
 ```rust
 fn simple_example() {
-    // Create a seeded mutator with a maximum size of 128 bytes for printable
-    // ASCII characters
-    let mut mutator = Mutator::new(128, true, 0xd7ebfe9b8e89fa50);
+    // Create a mutator for 128-byte ASCII printable inputs
+    let mut mutator = Mutator::new().max_input_size(128).printable(true);
 
     for _ in 0..128 {
         // Update the input
@@ -113,9 +112,8 @@ fn corpus_example() {
         }
     }
 
-    // Create a seeded mutator with a maximum size of 128 bytes for printable
-    // ASCII characters
-    let mut mutator = Mutator::new(128, true, 0xd7ebfe9b8e89fa50);
+    // Create a mutator for 128-byte ASCII printable inputs
+    let mut mutator = Mutator::new().max_input_size(128).printable(true);
 
     for _ in 0..128 {
         // Update the input
