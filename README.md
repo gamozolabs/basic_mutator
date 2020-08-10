@@ -129,5 +129,6 @@ fn corpus_example() {
         // Just print the string
         println!("feedback: {}", String::from_utf8_lossy(&mutator.input));
     }
+}
 ```
 
