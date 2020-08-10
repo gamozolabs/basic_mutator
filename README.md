@@ -15,6 +15,10 @@ To use this mutator, simply create a `Mutator`. This is done by calling
 `Mutator::new` with a maximum input size, a bool indicating whether or not the
 input is ASCII-printable only, and a random seed to seed the internal RNG.
 
+A seed should be provided in all cases via the builder syntax, eg,
+`Mutator::new().seed(0xdeadbeef)`. _The mutator has no source of external
+entropy and thus without a seed will produce the same sequence of mutations._
+
 Once this `Mutator` has been created, fill `mutator.input`, a public `Vec<u8>`
 member, with the input you want to mutate. It is highly encouraged that you use
 `mutator.input.clear()` and `mutator.input.extend_from_slice()` rather than
@@ -75,7 +79,8 @@ Here's a basic example with no corpus or `accessed` guidance.
 ```rust
 fn simple_example() {
     // Create a mutator for 128-byte ASCII printable inputs
-    let mut mutator = Mutator::new().max_input_size(128).printable(true);
+    let mut mutator = Mutator::new().seed(1337)
+        .max_input_size(128).printable(true);
 
     for _ in 0..128 {
         // Update the input
@@ -113,7 +118,8 @@ fn corpus_example() {
     }
 
     // Create a mutator for 128-byte ASCII printable inputs
-    let mut mutator = Mutator::new().max_input_size(128).printable(true);
+    let mut mutator = Mutator::new().seed(1337)
+        .max_input_size(128).printable(true);
 
     for _ in 0..128 {
         // Update the input

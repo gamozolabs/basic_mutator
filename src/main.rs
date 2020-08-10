@@ -870,7 +870,8 @@ impl Mutator {
 #[test]
 fn simple_example() {
     // Create a mutator for 128-byte ASCII printable inputs
-    let mut mutator = Mutator::new().max_input_size(128).printable(true);
+    let mut mutator = Mutator::new().seed(1337)
+        .max_input_size(128).printable(true);
 
     for _ in 0..128 {
         // Update the input
@@ -903,7 +904,8 @@ fn corpus_example() {
     }
 
     // Create a mutator for 128-byte ASCII printable inputs
-    let mut mutator = Mutator::new().max_input_size(128).printable(true);
+    let mut mutator = Mutator::new().seed(1337)
+        .max_input_size(128).printable(true);
 
     for _ in 0..128 {
         // Update the input
