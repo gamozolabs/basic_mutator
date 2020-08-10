@@ -15,6 +15,7 @@ First, create a project with `basic_mutator` as a dependency in your
 `Cargo.toml`
 
 ```
+[dependencies]
 basic_mutator = { git = "https://github.com/gamozolabs/basic_mutator" }
 ```
 
