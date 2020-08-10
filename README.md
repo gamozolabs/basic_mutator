@@ -11,6 +11,13 @@ streams of bytes.
 
 # Usage
 
+First, create a project with `basic_mutator` as a dependency in your
+`Cargo.toml`
+
+```
+basic_mutator = { git = "https://github.com/gamozolabs/basic_mutator" }
+```
+
 To use this mutator, simply create a `Mutator`. This is done by calling
 `Mutator::new` with a maximum input size, a bool indicating whether or not the
 input is ASCII-printable only, and a random seed to seed the internal RNG.
