@@ -1,5 +1,5 @@
 [package]
-name = "mutator"
+name = "basic_mutator"
 version = "0.1.0"
 authors = ["Brandon Falk <bfalk@gamozolabs.com>"]
 edition = "2018"
