@@ -873,7 +873,7 @@ fn simple_example() {
 }
 
 #[test]
-fn feedback_example() {
+fn corpus_example() {
     // Create a fake database which will be used to select inputs from a fake
     // feedback dattabase
     struct TestDatabase;
