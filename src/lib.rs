@@ -34,16 +34,22 @@ pub trait InputDatabase {
 }
 
 /// A basic random number generator based on xorshift64 with 64-bits of state
-struct Rng(u64);
+struct Rng {
+    /// The RNG's seed and state
+    seed: u64,
+
+    /// If set, `rand_exp` behaves the same as `rand`
+    exp_disabled: bool,
+}
 
 impl Rng {
     /// Generate a random number
     #[inline]
     fn next(&mut self) -> u64 {
-        let val = self.0;
-        self.0 ^= self.0 << 13;
-        self.0 ^= self.0 >> 17;
-        self.0 ^= self.0 << 43;
+        let val = self.seed;
+        self.seed ^= self.seed << 13;
+        self.seed ^= self.seed >> 17;
+        self.seed ^= self.seed << 43;
         val
     }
 
@@ -73,6 +79,11 @@ impl Rng {
     /// this will always return uniform at least half the time.
     #[inline]
     fn rand_exp(&mut self, min: usize, max: usize) -> usize {
+        // If exponential random is disabled, fall back to uniform
+        if self.exp_disabled {
+            return self.rand(min, max);
+        }
+
         if self.rand(0, 1) == 0 {
             // Half the time, provide uniform
             self.rand(min, max)
@@ -84,6 +95,8 @@ impl Rng {
     }
 }
 
+/// A mutator, a playground for corrupting the public `input` vector when
+/// `mutate` is invoked
 pub struct Mutator {
     /// Input vector to mutate, this is just an entire input files bytes
     ///
@@ -110,11 +123,11 @@ pub struct Mutator {
     /// It is strongly recommended that you do `accessed.clear()` and
     /// `accessed.extend_from_slice()` to update this buffer, to prevent the
     /// backing from being deallocated and reallocated.
-    accessed: Vec<usize>,
+    pub accessed: Vec<usize>,
 
     /// Maximum size to allow inputs to expand to
     max_input_size: usize,
-    
+
     /// The random number generator used for mutations
     rng: Rng,
 
@@ -152,22 +165,47 @@ macro_rules! byte_corruptor {
 
 impl Mutator { 
     /// Create a new mutator
-    ///
-    /// `max_input_size` specifies the maximum input size that will be produced
-    /// and consumed by the mutator.
-    ///
-    /// `printable` specifies if the output should only contain ASCII printable
-    /// characters
-    ///
-    /// `seed` specifies a seed for the random number generator
-    pub fn new(max_input_size: usize, printable: bool, seed: u64) -> Self {
+    pub fn new() -> Self {
         Mutator {
             input:          Vec::new(),
             accessed:       Vec::new(),
-            rng:            Rng(seed ^ 0x12640367f4b7ea35),
-            max_input_size: max_input_size,
-            printable:      printable,
+            max_input_size: 1024,
+            printable:      false,
+            rng: Rng {
+                seed:         0x12640367f4b7ea35,
+                exp_disabled: false,
+            },
         }
+    }
+
+    /// Set whether or not this mutator should produce only ASCII-printable
+    /// characters.
+    ///
+    /// If non-printable characters are used in part of the corpus or existing
+    /// input, they may be inherited and still exist in the output of the
+    /// fuzzer.
+    pub fn printable(mut self, printable: bool) -> Self {
+        self.printable = printable;
+        self
+    }
+    
+    /// Allows enabling and disabling of exponential random in the fuzzer. If
+    /// disabled, all random selections will be uniform.
+    pub fn rand_exp(mut self, exponential_random: bool) -> Self {
+        self.rng.exp_disabled = !exponential_random;
+        self
+    }
+
+    /// Sets the seed for the internal RNG
+    pub fn seed(mut self, seed: u64) -> Self {
+        self.rng.seed = seed ^ 0x12640367f4b7ea35;
+        self
+    }
+
+    /// Sets the maximum input size
+    pub fn max_input_size(mut self, size: usize) -> Self {
+        self.max_input_size = size;
+        self
     }
 
     /// Performs standard mutation of an the input
@@ -196,6 +234,13 @@ impl Mutator {
             Mutator::splice_overwrite,
             Mutator::splice_insert,
         ];
+
+        // Save the old state of the exponential random and randomly disable
+        // the exponential random
+        let old_exp_state = self.rng.exp_disabled;
+        if self.rng.rand(0, 1) == 0 {
+            self.rng.exp_disabled = true;
+        }
 
         for _ in 0..mutations {
             // Pick a random mutation strategy
@@ -256,8 +301,10 @@ impl Mutator {
                 // Run the mutation strategy
                 strat(self);
             }
-
         }
+            
+        // Restore exponential random state to the old state
+        self.rng.exp_disabled = old_exp_state;
     }
 
     /// Pick a random offset in the input to corrupt. Any mutation
@@ -406,7 +453,7 @@ impl Mutator {
         // Convert the range to a random number from [-range, range]
         let delta = self.rng.rand(0, range * 2) as i32 - range as i32;
 
-        /// Macro to mutate bytes in the file as a `$ty`
+        /// Macro to mutate bytes in the input as a `$ty`
         macro_rules! mutate {
             ($ty:ty) => {{
                 // Interpret the `offset` as a `$ty`
@@ -457,7 +504,7 @@ impl Mutator {
         // Pick offset to memset at
         let offset = self.rand_offset();
 
-        // Pick random length to remainder of file
+        // Pick random length to remainder of input
         let len = self.rng.rand_exp(1, self.input.len() - offset);
 
         // Pick the value to memset
@@ -852,47 +899,55 @@ impl Mutator {
 
 #[test]
 fn simple_example() {
-    // Create a seeded mutator with a maximum size of 128 bytes for printable
-    // ASCII characters
-    let mut mutator = Mutator::new(128, true, 0xd7ebfe9b8e89fa50);
+    // Create a mutator for 128-byte ASCII printable inputs
+    let mut mutator = Mutator::new().seed(1337)
+        .max_input_size(128).printable(true);
 
-    for _ in 0..32 {
+    for _ in 0..128 {
         // Update the input
         mutator.input.clear();
         mutator.input.extend_from_slice(b"APPLES ARE DELICIOUS");
 
         // Corrupt it with 4 mutation passes
         mutator.mutate(4, &EmptyDatabase);
+        assert!(mutator.input.len() <= 128);
 
         // Just print the string
-        println!("{:?}", String::from_utf8_lossy(&mutator.input));
+        println!("simple: {}", String::from_utf8_lossy(&mutator.input));
     }
 }
 
 #[test]
-fn feedback_example() {
+fn corpus_example() {
     // Create a fake database which will be used to select inputs from a fake
     // feedback dattabase
     struct TestDatabase;
     impl InputDatabase for TestDatabase {
-        fn num_inputs(&self) -> usize { 1 }
-        fn input(&self, _idx: usize) -> Option<&[u8]> { Some(b"thisisatest") }
+        fn num_inputs(&self) -> usize { 2 }
+        fn input(&self, idx: usize) -> Option<&[u8]> {
+            match idx {
+                0 => Some(b"thisisatest"),
+                1 => Some(b"wafflesaregood"),
+                _ => unreachable!(),
+            }
+        }
     }
 
-    // Create a seeded mutator with a maximum size of 128 bytes for printable
-    // ASCII characters
-    let mut mutator = Mutator::new(128, true, 0xd7ebfe9b8e89fa50);
+    // Create a mutator for 128-byte ASCII printable inputs
+    let mut mutator = Mutator::new().seed(1337)
+        .max_input_size(128).printable(true);
 
-    for _ in 0..32 {
+    for _ in 0..128 {
         // Update the input
         mutator.input.clear();
         mutator.input.extend_from_slice(b"APPLES ARE DELICIOUS");
 
         // Corrupt it with 4 mutation passes
         mutator.mutate(4, &TestDatabase);
+        assert!(mutator.input.len() <= 128);
 
         // Just print the string
-        println!("{:?}", String::from_utf8_lossy(&mutator.input));
+        println!("feedback: {}", String::from_utf8_lossy(&mutator.input));
     }
 }
 
