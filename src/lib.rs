@@ -2,6 +2,8 @@
 
 pub mod magic_values;
 
+extern crate alloc;
+use alloc::vec::Vec;
 use core::convert::TryInto;
 use magic_values::MAGIC_VALUES;
 
@@ -252,9 +254,9 @@ impl Mutator {
             // Determine if we're doing an overwrite or insert splice strategy,
             // as we have to handle these a bit specially due to the use of
             // a generic input database.
-            let splice_overwrite = std::ptr::eq(strat as *const (),
+            let splice_overwrite = core::ptr::eq(strat as *const (),
                 Mutator::splice_overwrite as *const ());
-            let splice_insert = std::ptr::eq(strat as *const (),
+            let splice_insert = core::ptr::eq(strat as *const (),
                 Mutator::splice_insert as *const ());
 
             // Handle special-case mutations which need input database access
