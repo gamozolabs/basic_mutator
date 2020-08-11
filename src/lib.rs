@@ -1,8 +1,11 @@
 //! Basic fuzzer mutation strategies
 
+// No need for std
+#![no_std]
+extern crate alloc;
+
 pub mod magic_values;
 
-extern crate alloc;
 use alloc::vec::Vec;
 use core::convert::TryInto;
 use magic_values::MAGIC_VALUES;
@@ -918,57 +921,66 @@ impl Mutator {
     });
 }
 
-#[test]
-fn simple_example() {
-    // Create a mutator for 128-byte ASCII printable inputs
-    let mut mutator = Mutator::new().seed(1337)
-        .max_input_size(128).printable(true);
+#[cfg(test)]
+mod test {
+    extern crate std;
+    use std::println;
+    use alloc::string::String;
 
-    for _ in 0..128 {
-        // Update the input
-        mutator.input.clear();
-        mutator.input.extend_from_slice(b"APPLES ARE DELICIOUS");
+    use crate::*;
 
-        // Corrupt it with 4 mutation passes
-        mutator.mutate(4, &EmptyDatabase);
-        assert!(mutator.input.len() <= 128);
+    #[test]
+    fn simple_example() {
+        // Create a mutator for 128-byte ASCII printable inputs
+        let mut mutator = Mutator::new().seed(1337)
+            .max_input_size(128).printable(true);
 
-        // Just print the string
-        println!("simple: {}", String::from_utf8_lossy(&mutator.input));
-    }
-}
+        for _ in 0..128 {
+            // Update the input
+            mutator.input.clear();
+            mutator.input.extend_from_slice(b"APPLES ARE DELICIOUS");
 
-#[test]
-fn corpus_example() {
-    // Create a fake database which will be used to select inputs from a fake
-    // feedback dattabase
-    struct TestDatabase;
-    impl InputDatabase for TestDatabase {
-        fn num_inputs(&self) -> usize { 2 }
-        fn input(&self, idx: usize) -> Option<&[u8]> {
-            match idx {
-                0 => Some(b"thisisatest"),
-                1 => Some(b"wafflesaregood"),
-                _ => unreachable!(),
-            }
+            // Corrupt it with 4 mutation passes
+            mutator.mutate(4, &EmptyDatabase);
+            assert!(mutator.input.len() <= 128);
+
+            // Just print the string
+            println!("simple: {}", String::from_utf8_lossy(&mutator.input));
         }
     }
 
-    // Create a mutator for 128-byte ASCII printable inputs
-    let mut mutator = Mutator::new().seed(1337)
-        .max_input_size(128).printable(true);
+    #[test]
+    fn corpus_example() {
+        // Create a fake database which will be used to select inputs from a fake
+        // feedback dattabase
+        struct TestDatabase;
+        impl InputDatabase for TestDatabase {
+            fn num_inputs(&self) -> usize { 2 }
+            fn input(&self, idx: usize) -> Option<&[u8]> {
+                match idx {
+                    0 => Some(b"thisisatest"),
+                    1 => Some(b"wafflesaregood"),
+                    _ => unreachable!(),
+                }
+            }
+        }
 
-    for _ in 0..128 {
-        // Update the input
-        mutator.input.clear();
-        mutator.input.extend_from_slice(b"APPLES ARE DELICIOUS");
+        // Create a mutator for 128-byte ASCII printable inputs
+        let mut mutator = Mutator::new().seed(1337)
+            .max_input_size(128).printable(true);
 
-        // Corrupt it with 4 mutation passes
-        mutator.mutate(4, &TestDatabase);
-        assert!(mutator.input.len() <= 128);
+        for _ in 0..128 {
+            // Update the input
+            mutator.input.clear();
+            mutator.input.extend_from_slice(b"APPLES ARE DELICIOUS");
 
-        // Just print the string
-        println!("feedback: {}", String::from_utf8_lossy(&mutator.input));
+            // Corrupt it with 4 mutation passes
+            mutator.mutate(4, &TestDatabase);
+            assert!(mutator.input.len() <= 128);
+
+            // Just print the string
+            println!("feedback: {}", String::from_utf8_lossy(&mutator.input));
+        }
     }
 }
 
