@@ -524,27 +524,46 @@ impl Mutator {
     fn swap_ranges(vec: &mut [u8], mut offset1: usize, mut offset2: usize,
                    mut len: usize) {
         if offset1 < offset2 && offset1 + len >= offset2 {
-            // [o1-------]
-            //     [o2-------]
+            // The ranges have the following layout here:
+            // [o1--------]
+            //      [o2--------]
             let tail = offset2 - offset1;
+            // Copy the tail from offset1 into offset2
+            // [o1-][tail1]
+            //      [o2-][tail2]
+            // This needs to happen in the reverse order so that the later
+            // values at offset1 are not mangled in the process of copying.
+            // Same as memmove.
             for ii in (tail..len).rev() {
                 vec[offset2 + ii] = vec[offset1 + ii];
             }
 
+            // After this, the layout is the following:
+            // [o1-][xxxxx]
+            //      [o2-][tail1]
             len = tail;
         } else if offset2 < offset1 && offset2 + len >= offset1 {
-            //     [o1-------]
-            // [o2-------]
+            // The ranges have the following layout here:
+            //      [o1--------]
+            // [o2--------]
             let head = len - (offset1 - offset2);
+            // Copy the head from offset1 into offset2
+            //      [head1][o1-]
+            // [head2][o2-]
             for ii in 0..head {
                 vec[offset2 + ii] = vec[offset1 + ii];
             }
-            
+
+            // After this, the layout is the following:
+            //      [xxxxx][o1-]
+            // [head1][o2-]
             offset1 += head;
             offset2 += head;
             len     -= head;
         }
 
+        // At this point, the ranges are non-overlapping
+        // and the swap can be done in a naive way.
         for ii in 0..len {
             vec.swap(offset1 + ii, offset2 + ii);
         }
